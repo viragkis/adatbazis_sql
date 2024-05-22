@@ -20,11 +20,6 @@ GROUP BY V.NEV
 Vegyünk fel két új oszlopot, amelyben a vendég legelső, illetve legutolsó foglalásának dátuma szerepel
 A foglalás dátumánál a METTOL oszlopot használjuk
 
-SELECT V.USERNEV, 
-    V.NEV, 
-    V.SZUL_DAT,
-    COUNT(*) OVER(PARTITION BY V.USERNEV ORDER BY F.METTOL)
-FROM Vendeg V JOIN Foglalas F ON V.USERNEV=F.UGYFEL_FK
 
 4.)Jelenítsük meg, hogy hány foglalás történt szobánként, naponta (METTOL), valamint szobánként, azon belül naponta 
 Szempontonként külön-külön számoljuk a foglalásokat
@@ -84,7 +79,3 @@ insert into STUDENT(ID, Nev, Teljesitett_felevek, Eredmenyek, Nyelvtudas) values
 Egy szereplő neve csak egyszer jelenjen meg
 Tom Hanks ne legyen benne a listában
 
-MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
-WHERE p.name ='Tom Hanks'
-RETURN p.name, collect(m.title)
-GROUP BY m.title
