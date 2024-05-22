@@ -1,0 +1,90 @@
+1.)Jelenítsük meg minden egyes szoba esetén, hogy hányszor foglalták le!
+Csak a szoba azonosítója és a foglalások darabszáma jelenjen meg
+Azok a szobák is jelenjenek meg, ahol nem történt foglalás
+
+SELECT SZOBA_ID,
+	COUNT(*) AS 'LEFOGLALÁSOK SZÁMA'
+FROM SZOBA
+GROUP BY SZOBA_ID
+
+2.)Listázzuk azon vendégek adatait, akik a legtöbb férőhelyes szobát (vagy szobákat) már lefoglalták!
+Csak klímás szoba jöhet számításba
+
+SELECT *
+FROM Szoba SZ JOIN Foglalas F ON SZ.SZOBA_ID= F.SZOBA_FK
+    JOIN Vendeg V  ON F.UGYFEL_FK=V.USERNEV
+WHERE SZ.KLIMAS=1
+GROUP BY V.NEV
+
+3.)Listázzuk a vendégek azonosítóját, nevét és születési dátumát!
+Vegyünk fel két új oszlopot, amelyben a vendég legelső, illetve legutolsó foglalásának dátuma szerepel
+A foglalás dátumánál a METTOL oszlopot használjuk
+
+SELECT V.USERNEV, 
+    V.NEV, 
+    V.SZUL_DAT,
+    COUNT(*) OVER(PARTITION BY V.USERNEV ORDER BY F.METTOL)
+FROM Vendeg V JOIN Foglalas F ON V.USERNEV=F.UGYFEL_FK
+
+4.)Jelenítsük meg, hogy hány foglalás történt szobánként, naponta (METTOL), valamint szobánként, azon belül naponta 
+Szempontonként külön-külön számoljuk a foglalásokat
+A foglalások száma minden esetben legalább 2 legyen
+
+SELECT COUNT(*) OVER(PARTITION BY SZOBA_FK, METTOL) AS 'SZOBÁNKÉNT AZON BELÜL NAPONTA',
+    COUNT(*) OVER(PARTITION BY METTOL, SZOBA_FK) AS 'NAPONTA AZON BELÜL SZOBÁNKÉNT'
+FROM Foglalas
+WHERE COUNT(*)>=2
+
+5.)Készítsünk ideiglenes táblát #MASKED_GUEST néven, ahol 
+a tábla felépítése megegyezik a vendég tábláéval, DE
+a vendégek nevének csak az első 2, és az utolsó 3 karaktere jelenjen meg, közötte X-ek legyenek!
+
+CREATE TABLE #MASKED_GUEST
+(
+	USERNEV varchar(20),
+	NEV varchar(50) MASKED WITH (FUNCTION='partial(2,"xxxx", 3)'),
+	EMAIL varchar(60),
+	SZAML_CIM nvarchar(100),
+	SZUL_ADAT DATE
+)
+
+6.)Valósítsa meg REDIS-ben a következő táblákat:
+IRO(ID, nev, nemzetiseg)
+KONYV(ID, cim, mufaj, IRO_ID)
+Vigyen fel táblánként legalább 2-2 sornyi adatot!
+
+hset IRO:1 id 1 nev "Szabo Magda" nemzetiseg magyar
+hset IRO:2 id 2 nev "Benedek Elek" nemzetiseg magyar
+
+hset KONYV:1 id 1 cim Abigel mufaj regeny IRO_ID 1
+hset KONYV:2 id 2 cim "Az ajto" mufaj regeny IRO_ID 1
+
+7.)Cassandra CQL Shellben hozza létre a következő táblát:
+STUDENT(ID, Nev, Teljesitett_felevek, Eredmenyek, Nyelvtudas)
+Az ID legyen az elsődleges kulcs
+A Teljesitett félévek legyen LIST, tartalma egész számok, pl: 1, 2, 3
+Az Eredmenyek legyen MAP, tartalma, hogy melyik félévben mennyi volt az átlag, pl: 1: 3,00, 2: 4.55, 3: 4,10
+A Nyelvtudas legyen SET, tartalma a nyelvek megnevezése
+Vigyen fel legalább 2 rekordot!
+
+create table STUDENT
+	(
+		ID,
+		Nev text,
+		Teljesitett_felevek list<int>,
+		Eredmenyek map<int, float>,
+		nyelvtudas set<text>,
+		PRIMARY KEY(ID)
+	);
+
+insert into STUDENT(ID, Nev, Teljesitett_felevek, Eredmenyek, Nyelvtudas) values(1, "Nagy Ivo", [1,2,3,4], {1: 3.00, 2: 4.55, 3: 4.10, 4: 3.90},{'angol', 'francia'});
+insert into STUDENT(ID, Nev, Teljesitett_felevek, Eredmenyek, Nyelvtudas) values(2, "Kiss Jozsef", [1,2], {1: 2.00, 2: 4.55},{'nemet', 'olasz'});
+
+8.)A Neo4j Sandbox-ban vagy a Desktopban jelenítsük meg azon személyeket, akik egy filmben szerepeltek Tom Hanks-sel.
+Egy szereplő neve csak egyszer jelenjen meg
+Tom Hanks ne legyen benne a listában
+
+MATCH (p:Person)-[:ACTED_IN]->(m:Movie)
+WHERE p.name ='Tom Hanks'
+RETURN p.name, collect(m.title)
+GROUP BY m.title
